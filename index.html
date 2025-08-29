@@ -13,6 +13,9 @@
     <div id=a>
       <canvas id=hold></canvas>
     </div>
+    <div style="margin-top:0.5rem">
+      <a class=button id=botStepBtn>Bot Step</a>
+    </div>
     <ul id=replay style=display:none>
       <li><a onclick=replay(-1)>prev</a>
       <li><a onclick=replay()>Play/Pause</a>
@@ -102,4 +105,17 @@
 <script src=preview.js></script>
 <script src=menu.js></script>
 <script src=bg.js></script>
+<script src=bot.js></script>
+<script>
+  (function(){
+    var btn = document.getElementById('botStepBtn');
+    if(btn){
+      btn.addEventListener('click', function(){
+        if(window.botIntegration && window.botIntegration.runOneStep){
+          window.botIntegration.runOneStep();
+        }
+      });
+    }
+  })();
+  </script>
 <script>_gaq=[['_setAccount','UA-30472693-1'],['_trackPageview']];(function(d){var g=d.createElement('script'),s=d.scripts[0];g.src='//www.google-analytics.com/ga.js';s.parentNode.insertBefore(g,s)})(document)</script>
