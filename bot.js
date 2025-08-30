@@ -15,8 +15,6 @@
 			for(var x=0;x<width;x++){
 				var cell = (stack.grid && stack.grid[x] && stack.grid[x][y]);
 				if (cell) {
-					// cell value is index + 1. index maps to piece.
-					// garbage blocks are 8.
 					row[x] = (cell >= 1 && cell <= 7) ? pieceMap[cell - 1] : 'Z';
 				} else {
 					row[x] = null;
@@ -42,7 +40,6 @@
 	}
 
 	function currentStateToTBPStartMessage(){
-		// The queue should include the current piece.
 		var queue = [];
 		if (piece) {
 			queue.push(mapIndexToTBPPiece(piece.index));
@@ -50,16 +47,14 @@
 		if (preview && preview.grabBag) {
 			queue.push.apply(queue, preview.grabBag.slice(0, 5).map(mapIndexToTBPPiece));
 		}
-
 		var holdPiece = (typeof hold !== 'undefined' && hold.piece !== void 0) ? mapIndexToTBPPiece(hold.piece) : null;
-
 		return {
 			type: 'start',
 			board: getBoardMatrix(),
 			hold: holdPiece,
 			queue: queue,
-			combo: 0, // Assuming no combo tracking
-			back_to_back: false, // Assuming no b2b tracking
+			combo: 0,
+			back_to_back: false,
 		};
 	}
 
@@ -69,19 +64,14 @@
 		var location = move.location;
 		var targetPiece = location.type;
 
-		// Hold if necessary
 		if(targetPiece && mapIndexToTBPPiece(piece.index) !== targetPiece){
 			piece.hold();
-			// After hold, the piece object is updated to the new piece.
-			// We need to wait for the next step to control the new piece.
-			// For now, we assume the bot gives a move for the current piece or the piece from hold.
 		}
 
-		// Rotate
 		var targetRotation = mapOrientationToRotation(location.orientation);
 		var currentRotation = piece.pos.mod(4);
 		var rotationDiff = (targetRotation - currentRotation + 4).mod(4);
-		if (rotationDiff === 3) { // prefer counter-clockwise
+		if (rotationDiff === 3) {
 			piece.rotate(-1);
 		} else {
 			for (var i = 0; i < rotationDiff; i++) {
@@ -89,22 +79,6 @@
 			}
 		}
 
-		// Move
-		// We need to find the target X for the piece's top-left corner.
-		// The bot gives the final X of the piece's center. This is tricky.
-		// The `executeBotInstruction` in the original bot.js had a simple loop.
-		// Let's try to replicate that. The bot gives the column of the leftmost part of the piece.
-		// Let's assume the 'x' from the bot is the final column of the piece's top-left corner.
-		var targetX = location.x;
-
-		// The piece's `x` is the column of its bounding box's left edge.
-		// The bot's `x` in the location object is the column of the top-left-most block of the piece.
-		// This requires a more complex calculation based on the piece's shape and rotation.
-		// For simplicity, let's assume the bot's 'x' is the target for piece.x.
-		// This might be wrong.
-
-		// A better approach is to check the piece's minos.
-		// The final X position of the piece object should be such that the leftmost mino of the piece is at location.x
 		var pieceXOffset = 0;
 		for (var y = 0; y < piece.tetro.length; y++) {
 			for (var x = 0; x < piece.tetro[y].length; x++) {
@@ -115,8 +89,7 @@
 			}
 			if (pieceXOffset > 0) break;
 		}
-		targetX = location.x - pieceXOffset;
-
+		var targetX = location.x - pieceXOffset;
 
 		var currentX = Math.round(piece.x);
 		var dx = targetX - currentX;
@@ -125,7 +98,6 @@
 			piece.shift(dir);
 		}
 
-		// Hard drop
 		piece.hardDrop();
 	}
 
@@ -133,11 +105,14 @@
 		if (!botReady || gameState !== 0) {
 			return;
 		}
-		botReady = false;
-
-		var startMessage = currentStateToTBPStartMessage();
-		botWorker.postMessage(startMessage);
-		botWorker.postMessage({ type: 'suggest' });
+		try {
+			botReady = false;
+			var startMessage = currentStateToTBPStartMessage();
+			botWorker.postMessage(startMessage);
+			botWorker.postMessage({ type: 'suggest' });
+		} catch (e) {
+			botReady = true; // allow trying again
+		}
 	}
 
 	try {
@@ -147,31 +122,29 @@
 			var msg = e.data;
 			switch(msg.type) {
 				case 'ready':
+				case 'info':
 					botReady = true;
 					break;
 				case 'suggestion':
 					if (msg.moves && msg.moves.length > 0) {
 						executeBotInstruction(msg.moves[0]);
 					}
-					// The bot is ready for the next move after making a suggestion.
 					botReady = true;
 					break;
 				case 'error':
-					console.error('MisaMinoTBP Error:', msg.error);
-					botReady = true; // Allow trying again
+					botReady = true;
 					break;
 				default:
-					console.log('MisaMinoTBP message:', msg);
+					//
 			}
 		};
 
 		botWorker.onerror = function(e) {
-			console.error('Error in bot worker:', e);
-			botReady = true; // Allow trying again
+			botReady = true;
 		};
 
 	} catch (e) {
-		console.error('Failed to initialize bot worker:', e);
+		// Worker initialization failed
 	}
 
 	window.botIntegration = {
