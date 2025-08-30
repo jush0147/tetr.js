@@ -108,20 +108,26 @@
 		}
 
 		var localCenter = getPieceCenter(piece.tetro);
-
-		var targetX = location.x - localCenter.x;
-
+		var target_tetris_x = location.x - localCenter.x;
 		var tetris_center_y = 21 - location.y;
-		var targetY = tetris_center_y - localCenter.y;
+		var target_tetris_y = tetris_center_y - localCenter.y;
 
-		var currentX = Math.round(piece.x);
-		var dx = targetX - currentX;
-		var dir = dx > 0 ? 1 : -1;
+		var current_tetris_x = Math.round(piece.x);
+		var dx = target_tetris_x - current_tetris_x;
+		var dir_x = dx > 0 ? 1 : -1;
 		for(var i=0; i<Math.abs(dx); i++){
-			piece.shift(dir);
+			piece.shift(dir_x);
 		}
 
-		piece.y = targetY;
+		var current_tetris_y = Math.round(piece.y);
+		var dy = target_tetris_y - current_tetris_y;
+		for(var i=0; i<dy; i++){
+			piece.y += 1;
+			if (!piece.moveValid(0,0,piece.tetro)) {
+				piece.y -= 1;
+				break;
+			}
+		}
 
 		stack.addPiece(piece.tetro);
 		setTimeout(function() {
