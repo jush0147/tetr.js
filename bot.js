@@ -6,21 +6,33 @@
 
 	function getBoardMatrix(){
 		var width = 10;
-		var visibleHeight = 20;
-		var board = new Array(visibleHeight);
-		var pieceMap = ['I','J','L','O','S','T','Z'];
-		for(var vy=0; vy<visibleHeight; vy++){
-			var y = vy + 2; // skip hidden rows 0..1
+		var height = 40;
+		var visible_tetr_js_rows = 20;
+		var board = new Array(height);
+
+		var pieceMap = ['I', 'J', 'L', 'O', 'S', 'T', 'Z'];
+		for (var i = 0; i < visible_tetr_js_rows; i++) {
+			var tetr_js_y = i + 2; // tetr.js rows 2-21
+			var tbp_y = 19 - i; // TBP rows 19-0
+
 			var row = new Array(width);
-			for(var x=0;x<width;x++){
-				var cell = (stack.grid && stack.grid[x] && stack.grid[x][y]);
+			for (var x = 0; x < width; x++) {
+				var cell = (stack.grid && stack.grid[x] && stack.grid[x][tetr_js_y]);
 				if (cell) {
-					row[x] = (cell >= 1 && cell <= 7) ? pieceMap[cell - 1] : 'Z';
+					if (cell >= 1 && cell <= 7) {
+						row[x] = pieceMap[cell - 1];
+					} else { // Garbage blocks (value 8)
+						row[x] = 'G';
+					}
 				} else {
 					row[x] = null;
 				}
 			}
-			board[vy] = row;
+			board[tbp_y] = row;
+		}
+
+		for (var y = 20; y < height; y++) {
+			board[y] = new Array(width).fill(null);
 		}
 		return board;
 	}
