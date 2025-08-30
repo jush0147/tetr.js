@@ -80,14 +80,14 @@
 		}
 
 		var pieceXOffset = 0;
+		foundX:
 		for (var y = 0; y < piece.tetro.length; y++) {
 			for (var x = 0; x < piece.tetro[y].length; x++) {
 				if (piece.tetro[y][x]) {
 					pieceXOffset = x;
-					break;
+					break foundX;
 				}
 			}
-			if (pieceXOffset > 0) break;
 		}
 		var targetX = location.x - pieceXOffset;
 
@@ -99,19 +99,22 @@
 		}
 
 		var pieceYOffset = 0;
+		foundY:
 		for (var y = 0; y < piece.tetro.length; y++) {
-			var row = piece.tetro[y];
-			for (var x = 0; x < row.length; x++) {
-				if (row[x]) {
+			for (var x = 0; x < piece.tetro[y].length; x++) {
+				if (piece.tetro[y][x]) {
 					pieceYOffset = y;
-					break;
+					break foundY;
 				}
 			}
-			if (pieceYOffset > 0) break;
 		}
-		var targetY = location.y - pieceYOffset;
 
-		piece.y = targetY + 2;
+		// TBP origin is bottom-left. tetr.js origin is top-left.
+		// tetr.js grid is 22 rows high. Visible part is 20 rows.
+		// Bottom row in tetr.js is y=21.
+		var targetY = (21 - location.y) - pieceYOffset;
+
+		piece.y = targetY;
 
 		stack.addPiece(piece.tetro);
 		setTimeout(function() {
