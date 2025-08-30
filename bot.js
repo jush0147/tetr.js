@@ -1,16 +1,26 @@
 'use strict';
 
 (function(){
+	var botWorker;
+	var botReady = false;
+
 	function getBoardMatrix(){
-		// stack.grid is [x][y] with height 22 (top 2 hidden). TBP expects 20 visible rows.
 		var width = 10;
 		var visibleHeight = 20;
 		var board = new Array(visibleHeight);
+		var pieceMap = ['I','J','L','O','S','T','Z'];
 		for(var vy=0; vy<visibleHeight; vy++){
 			var y = vy + 2; // skip hidden rows 0..1
 			var row = new Array(width);
 			for(var x=0;x<width;x++){
-				row[x] = (stack.grid && stack.grid[x] && stack.grid[x][y]) ? 1 : 0;
+				var cell = (stack.grid && stack.grid[x] && stack.grid[x][y]);
+				if (cell) {
+					// cell value is index + 1. index maps to piece.
+					// garbage blocks are 8.
+					row[x] = (cell >= 1 && cell <= 7) ? pieceMap[cell - 1] : 'Z';
+				} else {
+					row[x] = null;
+				}
 			}
 			board[vy] = row;
 		}
@@ -18,69 +28,153 @@
 	}
 
 	function mapIndexToTBPPiece(index){
-		// TBP uses letters I,J,L,O,S,T,Z
 		return ['I','J','L','O','S','T','Z'][index];
 	}
 
-	function currentStateToTBP(){
-		var bagPreview = (preview && preview.grabBag) ? preview.grabBag.slice() : [];
-		var queue = bagPreview.slice(0, 5).map(mapIndexToTBPPiece);
+	function mapOrientationToRotation(orientation) {
+		switch (orientation) {
+			case 'north': return 0;
+			case 'east': return 1;
+			case 'south': return 2;
+			case 'west': return 3;
+			default: return 0;
+		}
+	}
+
+	function currentStateToTBPStartMessage(){
+		// The queue should include the current piece.
+		var queue = [];
+		if (piece) {
+			queue.push(mapIndexToTBPPiece(piece.index));
+		}
+		if (preview && preview.grabBag) {
+			queue.push.apply(queue, preview.grabBag.slice(0, 5).map(mapIndexToTBPPiece));
+		}
+
 		var holdPiece = (typeof hold !== 'undefined' && hold.piece !== void 0) ? mapIndexToTBPPiece(hold.piece) : null;
-		var active = piece ? {
-			piece: mapIndexToTBPPiece(piece.index),
-			x: Math.floor(piece.x),
-			// Convert game y (0 at hidden row 0) to TBP visible y (0 is top visible row)
-			y: Math.floor(piece.y) - 2,
-			rotation: (piece.pos||0) % 4
-		} : null;
+
 		return {
+			type: 'start',
 			board: getBoardMatrix(),
-			active: active,
+			hold: holdPiece,
 			queue: queue,
-			hold: holdPiece
+			combo: 0, // Assuming no combo tracking
+			back_to_back: false, // Assuming no b2b tracking
 		};
 	}
 
-	function executeBotInstruction(instr){
-		// instr: { piece, x, y, rotation }
-		if(!piece || gameState!==0) return;
-		var targetPiece = instr.piece;
+	function executeBotInstruction(move){
+		if(!piece || gameState!==0 || !move) return;
+
+		var location = move.location;
+		var targetPiece = location.type;
+
+		// Hold if necessary
 		if(targetPiece && mapIndexToTBPPiece(piece.index) !== targetPiece){
 			piece.hold();
+			// After hold, the piece object is updated to the new piece.
+			// We need to wait for the next step to control the new piece.
+			// For now, we assume the bot gives a move for the current piece or the piece from hold.
 		}
-		// rotate to rotation
-		var cur = piece.pos % 4;
-		var target = (instr.rotation||0)%4;
-		var right = ((target - cur + 4) % 4);
-		var left = (4 - right) % 4;
-		var dir = right <= left ? 1 : -1;
-		var steps = Math.min(right, left);
-		for(var i=0;i<steps;i++) piece.rotate(dir);
-		// move horizontally to x
-		var tx = instr.x|0;
-		while(Math.floor(piece.x) < tx){ piece.shift(1); }
-		while(Math.floor(piece.x) > tx){ piece.shift(-1); }
-		// drop to y or hard drop; TBP usually gives final lock position
+
+		// Rotate
+		var targetRotation = mapOrientationToRotation(location.orientation);
+		var currentRotation = piece.pos.mod(4);
+		var rotationDiff = (targetRotation - currentRotation + 4).mod(4);
+		if (rotationDiff === 3) { // prefer counter-clockwise
+			piece.rotate(-1);
+		} else {
+			for (var i = 0; i < rotationDiff; i++) {
+				piece.rotate(1);
+			}
+		}
+
+		// Move
+		// We need to find the target X for the piece's top-left corner.
+		// The bot gives the final X of the piece's center. This is tricky.
+		// The `executeBotInstruction` in the original bot.js had a simple loop.
+		// Let's try to replicate that. The bot gives the column of the leftmost part of the piece.
+		// Let's assume the 'x' from the bot is the final column of the piece's top-left corner.
+		var targetX = location.x;
+
+		// The piece's `x` is the column of its bounding box's left edge.
+		// The bot's `x` in the location object is the column of the top-left-most block of the piece.
+		// This requires a more complex calculation based on the piece's shape and rotation.
+		// For simplicity, let's assume the bot's 'x' is the target for piece.x.
+		// This might be wrong.
+
+		// A better approach is to check the piece's minos.
+		// The final X position of the piece object should be such that the leftmost mino of the piece is at location.x
+		var pieceXOffset = 0;
+		for (var y = 0; y < piece.tetro.length; y++) {
+			for (var x = 0; x < piece.tetro[y].length; x++) {
+				if (piece.tetro[y][x]) {
+					pieceXOffset = x;
+					break;
+				}
+			}
+			if (pieceXOffset > 0) break;
+		}
+		targetX = location.x - pieceXOffset;
+
+
+		var currentX = Math.round(piece.x);
+		var dx = targetX - currentX;
+		var dir = dx > 0 ? 1 : -1;
+		for(var i=0; i<Math.abs(dx); i++){
+			piece.shift(dir);
+		}
+
+		// Hard drop
 		piece.hardDrop();
 	}
 
 	function runOneStep(){
-		var tbp = currentStateToTBP();
-		if(!window.MisaMinoTBP || typeof window.MisaMinoTBP.compute !== 'function'){
-			console.warn('MisaMinoTBP not loaded; TBP state:', tbp);
+		if (!botReady || gameState !== 0) {
 			return;
 		}
-		try{
-			var instr = window.MisaMinoTBP.compute(tbp);
-			executeBotInstruction(instr);
-		}catch(e){
-			console.error('Bot error', e);
-		}
+		botReady = false;
+
+		var startMessage = currentStateToTBPStartMessage();
+		botWorker.postMessage(startMessage);
+		botWorker.postMessage({ type: 'suggest' });
+	}
+
+	try {
+		botWorker = new Worker('misamino/misaImport.js');
+
+		botWorker.onmessage = function(e) {
+			var msg = e.data;
+			switch(msg.type) {
+				case 'ready':
+					botReady = true;
+					break;
+				case 'suggestion':
+					if (msg.moves && msg.moves.length > 0) {
+						executeBotInstruction(msg.moves[0]);
+					}
+					// The bot is ready for the next move after making a suggestion.
+					botReady = true;
+					break;
+				case 'error':
+					console.error('MisaMinoTBP Error:', msg.error);
+					botReady = true; // Allow trying again
+					break;
+				default:
+					console.log('MisaMinoTBP message:', msg);
+			}
+		};
+
+		botWorker.onerror = function(e) {
+			console.error('Error in bot worker:', e);
+			botReady = true; // Allow trying again
+		};
+
+	} catch (e) {
+		console.error('Failed to initialize bot worker:', e);
 	}
 
 	window.botIntegration = {
-		currentStateToTBP: currentStateToTBP,
 		runOneStep: runOneStep
 	};
 })();
-

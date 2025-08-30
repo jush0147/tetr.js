@@ -28,3 +28,10 @@ Controls are configurable
 - DAS and DAS delay settings
 - Adaptable game size
 - Last game replay
+
+## Bot Integration
+
+This project includes an integration with the MisaMinoTBP bot.
+
+- **How to use**: During a game, click the "Bot Step" button on the left side of the screen.
+- **Functionality**: Each click on the "Bot Step" button will ask the MisaMino bot for the best move for the current piece and execute it. This allows you to see the bot's decisions one move at a time.
