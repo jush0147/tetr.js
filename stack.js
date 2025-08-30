@@ -15,6 +15,7 @@ Stack.prototype.new = function(x, y) {
  * Adds tetro to the stack, and clears lines if they fill up.
  */
 Stack.prototype.addPiece = function(tetro) {
+  console.log('STACK: addPiece called');
   var once = false;
 
   // Add the piece to the stack.

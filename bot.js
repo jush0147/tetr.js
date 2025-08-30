@@ -98,7 +98,25 @@
 			piece.shift(dir);
 		}
 
-		piece.hardDrop();
+		var pieceYOffset = 0;
+		for (var y = 0; y < piece.tetro.length; y++) {
+			var row = piece.tetro[y];
+			for (var x = 0; x < row.length; x++) {
+				if (row[x]) {
+					pieceYOffset = y;
+					break;
+				}
+			}
+			if (pieceYOffset > 0) break;
+		}
+		var targetY = location.y - pieceYOffset;
+
+		piece.y = targetY + 2;
+
+		stack.addPiece(piece.tetro);
+		setTimeout(function() {
+			piece.new(preview.next());
+		}, 0);
 	}
 
 	function runOneStep(){
@@ -111,7 +129,7 @@
 			botWorker.postMessage(startMessage);
 			botWorker.postMessage({ type: 'suggest' });
 		} catch (e) {
-			botReady = true; // allow trying again
+			botReady = true;
 		}
 	}
 
