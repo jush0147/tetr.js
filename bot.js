@@ -39,6 +39,22 @@
 		}
 	}
 
+	function getPieceCenter(tetro) {
+		var mino_xs = [];
+		var mino_ys = [];
+		for (var y = 0; y < tetro.length; y++) {
+			for (var x = 0; x < tetro[y].length; x++) {
+				if (tetro[y][x]) {
+					mino_xs.push(x);
+					mino_ys.push(y);
+				}
+			}
+		}
+		var avg_x = mino_xs.reduce((a, b) => a + b, 0) / mino_xs.length;
+		var avg_y = mino_ys.reduce((a, b) => a + b, 0) / mino_ys.length;
+		return { x: avg_x, y: avg_y };
+	}
+
 	function currentStateToTBPStartMessage(){
 		var queue = [];
 		if (piece) {
@@ -79,17 +95,12 @@
 			}
 		}
 
-		var pieceXOffset = 0;
-		foundX:
-		for (var y = 0; y < piece.tetro.length; y++) {
-			for (var x = 0; x < piece.tetro[y].length; x++) {
-				if (piece.tetro[y][x]) {
-					pieceXOffset = x;
-					break foundX;
-				}
-			}
-		}
-		var targetX = location.x - pieceXOffset;
+		var localCenter = getPieceCenter(piece.tetro);
+
+		var targetX = location.x - localCenter.x;
+
+		var tetris_center_y = 21 - location.y;
+		var targetY = tetris_center_y - localCenter.y;
 
 		var currentX = Math.round(piece.x);
 		var dx = targetX - currentX;
@@ -97,22 +108,6 @@
 		for(var i=0; i<Math.abs(dx); i++){
 			piece.shift(dir);
 		}
-
-		var pieceYOffset = 0;
-		foundY:
-		for (var y = 0; y < piece.tetro.length; y++) {
-			for (var x = 0; x < piece.tetro[y].length; x++) {
-				if (piece.tetro[y][x]) {
-					pieceYOffset = y;
-					break foundY;
-				}
-			}
-		}
-
-		// TBP origin is bottom-left. tetr.js origin is top-left.
-		// tetr.js grid is 22 rows high. Visible part is 20 rows.
-		// Bottom row in tetr.js is y=21.
-		var targetY = (21 - location.y) - pieceYOffset;
 
 		piece.y = targetY;
 
