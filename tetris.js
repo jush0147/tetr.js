@@ -857,6 +857,9 @@ function gameLoop() {
     // Playing
 
     if (!paused) {
+      if (window.botIntegration && window.botIntegration.executeNextMove) {
+        window.botIntegration.executeNextMove();
+      }
       update();
     }
 

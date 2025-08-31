@@ -12,18 +12,13 @@
 
 		var pieceMap = ['I', 'J', 'L', 'O', 'S', 'T', 'Z'];
 		for (var i = 0; i < visible_tetr_js_rows; i++) {
-			var tetr_js_y = i + 2; // tetr.js rows 2-21
-			var tbp_y = 19 - i; // TBP rows 19-0
-
+			var tetr_js_y = i + 2;
+			var tbp_y = 19 - i;
 			var row = new Array(width);
 			for (var x = 0; x < width; x++) {
 				var cell = (stack.grid && stack.grid[x] && stack.grid[x][tetr_js_y]);
 				if (cell) {
-					if (cell >= 1 && cell <= 7) {
-						row[x] = pieceMap[cell - 1];
-					} else { // Garbage blocks (value 8)
-						row[x] = 'G';
-					}
+					row[x] = (cell >= 1 && cell <= 7) ? pieceMap[cell - 1] : 'G';
 				} else {
 					row[x] = null;
 				}
@@ -62,6 +57,7 @@
 				}
 			}
 		}
+		if (mino_xs.length === 0) return { x: 0, y: 0 };
 		var avg_x = mino_xs.reduce((a, b) => a + b, 0) / mino_xs.length;
 		var avg_y = mino_ys.reduce((a, b) => a + b, 0) / mino_ys.length;
 		return { x: avg_x, y: avg_y };
@@ -108,26 +104,18 @@
 		}
 
 		var localCenter = getPieceCenter(piece.tetro);
-		var target_tetris_x = location.x - localCenter.x;
+		var targetX = location.x - localCenter.x;
 		var tetris_center_y = 21 - location.y;
-		var target_tetris_y = tetris_center_y - localCenter.y;
+		var targetY = tetris_center_y - localCenter.y;
 
-		var current_tetris_x = Math.round(piece.x);
-		var dx = target_tetris_x - current_tetris_x;
-		var dir_x = dx > 0 ? 1 : -1;
+		var currentX = Math.round(piece.x);
+		var dx = targetX - currentX;
+		var dir = dx > 0 ? 1 : -1;
 		for(var i=0; i<Math.abs(dx); i++){
-			piece.shift(dir_x);
+			piece.shift(dir);
 		}
 
-		var current_tetris_y = Math.round(piece.y);
-		var dy = target_tetris_y - current_tetris_y;
-		for(var i=0; i<dy; i++){
-			piece.y += 1;
-			if (!piece.moveValid(0,0,piece.tetro)) {
-				piece.y -= 1;
-				break;
-			}
-		}
+		piece.y = targetY;
 
 		stack.addPiece(piece.tetro);
 		setTimeout(function() {
@@ -151,7 +139,6 @@
 
 	try {
 		botWorker = new Worker('misamino/misaImport.js');
-
 		botWorker.onmessage = function(e) {
 			var msg = e.data;
 			switch(msg.type) {
@@ -172,11 +159,9 @@
 					//
 			}
 		};
-
 		botWorker.onerror = function(e) {
 			botReady = true;
 		};
-
 	} catch (e) {
 		// Worker initialization failed
 	}
